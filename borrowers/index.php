@@ -19,7 +19,7 @@ $formBorrower = $flash['borrower'] ?? [
     'department' => '',
 ];
 $formAction = $flash['action'] ?? '';
-$formId = (int) ($flash['id'] ?? 0);
+$formId = (string) ($flash['id'] ?? '');
 
 $databaseError = null;
 if (DATABASE_ENABLED) {
@@ -40,7 +40,10 @@ if (DATABASE_ENABLED) {
 }
 
 $initialModal = isset($_GET['add']) ? 'add' : '';
-$requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
+$requestedEditId = $_GET['edit'] ?? '';
+if (!is_string($requestedEditId) || !preg_match('/^BOR-[0-9]{3,}$/D', $requestedEditId)) {
+    $requestedEditId = '';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -53,16 +56,16 @@ $requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
 <body>
 <div class="app-shell">
 <aside class="sidebar" aria-label="Main navigation">
-    <a class="brand-lockup" href="../index.php"><span class="brand-mark" aria-hidden="true">M</span><span>MATrack</span></a>
+    <a class="brand-lockup" href="../index.php"><img class="brand-logo" src="../assets/css/MATrack-Logo.png" alt="MATrack"></a>
     <p class="nav-heading">Overview</p>
     <nav class="side-nav">
-        <span class="nav-link disabled-link" aria-disabled="true"><span class="nav-icon" aria-hidden="true">▦</span>Dashboard</span>
+        <a class="nav-link" href="../dashboard/index.php"><span class="nav-icon" aria-hidden="true">▦</span>Dashboard</a>
     </nav>
     <p class="nav-heading">Inventory</p>
     <nav class="side-nav">
         <a class="nav-link" href="../materials/index.php"><span class="nav-icon" aria-hidden="true">▤</span>Materials</a>
         <a class="nav-link active" href="index.php" aria-current="page"><span class="nav-icon" aria-hidden="true">♙</span>Borrowers<span class="active-indicator" aria-hidden="true"></span></a>
-        <span class="nav-link disabled-link" aria-disabled="true"><span class="nav-icon" aria-hidden="true">↔</span>Transactions</span>
+        <a class="nav-link" href="../transactions/index.php"><span class="nav-icon" aria-hidden="true">↔</span>Transactions</a>
     </nav>
     <div class="sidebar-footer"><strong>MATrack</strong><span>Department inventory system</span></div>
 </aside>
@@ -98,10 +101,11 @@ $requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
         <?php else: ?>
             <div class="table-scroll">
                 <table>
-                    <thead><tr><th>Borrower Name</th><th>Contact</th><th>Department</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>ID</th><th>Borrower</th><th>Contact</th><th>Department</th><th>Actions</th></tr></thead>
                     <tbody>
                     <?php foreach ($borrowers as $borrower): ?>
                         <tr class="borrower-row" data-search="<?= escapeHtml(strtolower(implode(' ', [$borrower['borrower_name'], $borrower['contact'] ?? '', $borrower['department'] ?? '']))) ?>">
+                            <td class="record-id"><?= escapeHtml($borrower['borrower_id']) ?></td>
                             <td><span class="material-initial" aria-hidden="true"><?= escapeHtml(strtoupper(substr($borrower['borrower_name'], 0, 1))) ?></span><span class="material-name"><?= escapeHtml($borrower['borrower_name']) ?></span></td>
                             <td><?= escapeHtml($borrower['contact']) !== '' ? escapeHtml($borrower['contact']) : '<span class="muted">—</span>' ?></td>
                             <td><?= escapeHtml($borrower['department']) !== '' ? '<span class="category-pill">' . escapeHtml($borrower['department']) . '</span>' : '<span class="muted">—</span>' ?></td>
@@ -109,11 +113,11 @@ $requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
                                 <details class="action-menu">
                                     <summary aria-label="Actions for <?= escapeHtml($borrower['borrower_name']) ?>">•••</summary>
                                     <div class="action-menu-panel">
-                                        <button class="menu-action" type="button" data-open-modal="edit" data-id="<?= (int) $borrower['borrower_id'] ?>"
+                                        <button class="menu-action" type="button" data-open-modal="edit" data-id="<?= escapeHtml($borrower['borrower_id']) ?>"
                                             data-name="<?= escapeHtml($borrower['borrower_name']) ?>" data-contact="<?= escapeHtml($borrower['contact']) ?>"
                                             data-department="<?= escapeHtml($borrower['department']) ?>">Edit borrower</button>
                                         <form class="delete-form" action="delete.php" method="post" data-borrower-name="<?= escapeHtml($borrower['borrower_name']) ?>">
-                                            <input type="hidden" name="borrower_id" value="<?= (int) $borrower['borrower_id'] ?>">
+                                            <input type="hidden" name="borrower_id" value="<?= escapeHtml($borrower['borrower_id']) ?>">
                                             <button class="menu-action delete-menu-action" type="submit">Delete borrower</button>
                                         </form>
                                     </div>
@@ -132,8 +136,8 @@ $requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
 </main>
 </div>
 
-<div class="modal-backdrop" id="borrower-modal" hidden>
-    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-copy" tabindex="-1">
+<div class="drawer-shell" id="borrower-modal" hidden>
+    <section class="drawer-panel" role="region" aria-labelledby="modal-title" aria-describedby="modal-copy" tabindex="-1">
         <button class="modal-close" type="button" data-close-modal aria-label="Close dialog">×</button>
         <p class="eyebrow">Borrower records</p>
         <h2 id="modal-title">Add Borrower</h2>
@@ -181,14 +185,18 @@ $requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
         document.getElementById('modal-copy').textContent = editing ? 'Update this borrower’s contact or department details.' : 'Add a person to the department borrower list.';
         document.getElementById('submit-borrower').textContent = editing ? 'Save Changes' : 'Add Borrower';
         backdrop.hidden = false;
-        document.body.classList.add('modal-open');
+        requestAnimationFrame(() => backdrop.classList.add('is-open'));
+        document.body.classList.add('drawer-open');
         fields.name.focus();
     }
 
     function closeModal() {
-        backdrop.hidden = true;
-        document.body.classList.remove('modal-open');
+        backdrop.classList.remove('is-open');
+        document.body.classList.remove('drawer-open');
         if (lastTrigger) lastTrigger.focus();
+        window.setTimeout(() => {
+            if (!backdrop.classList.contains('is-open')) backdrop.hidden = true;
+        }, 220);
     }
 
     document.querySelectorAll('[data-open-modal]').forEach((button) => {
@@ -206,17 +214,9 @@ $requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
         });
     });
     document.querySelectorAll('[data-close-modal]').forEach((button) => button.addEventListener('click', closeModal));
-    backdrop.addEventListener('click', (event) => { if (event.target === backdrop) closeModal(); });
     document.addEventListener('keydown', (event) => {
         if (backdrop.hidden) return;
         if (event.key === 'Escape') closeModal();
-        if (event.key === 'Tab') {
-            const focusable = backdrop.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href], summary');
-            const first = focusable[0];
-            const last = focusable[focusable.length - 1];
-            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-        }
     });
 
     if (search) {
@@ -234,16 +234,16 @@ $requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
 
     <?php if ($initialModal !== ''): ?>openModal('add');<?php endif; ?>
     <?php if ($requestedEditId): ?>
-    const requestedEdit = document.querySelector('[data-open-modal="edit"][data-id="<?= (int) $requestedEditId ?>"]');
+    const requestedEdit = document.querySelector('[data-open-modal="edit"][data-id="<?= escapeHtml($requestedEditId) ?>"]');
     if (requestedEdit) openModal('edit', requestedEdit);
     <?php endif; ?>
     <?php if ($errors !== []): ?>
     const restoreEdit = <?= json_encode($formAction === 'edit') ?>;
     const restoreButton = restoreEdit
-        ? document.querySelector('[data-open-modal="edit"][data-id="<?= $formId ?>"]')
+        ? document.querySelector('[data-open-modal="edit"][data-id="<?= escapeHtml($formId) ?>"]')
         : null;
     openModal(restoreEdit ? 'edit' : 'add', restoreButton);
-    fields.id.value = '<?= $formId ?>' || fields.id.value;
+    fields.id.value = <?= json_encode($formId, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?> || fields.id.value;
     form.action = restoreEdit ? `edit.php?id=${encodeURIComponent(fields.id.value)}` : 'create.php';
     fields.name.value = <?= json_encode($formBorrower['borrower_name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     fields.contact.value = <?= json_encode($formBorrower['contact'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;

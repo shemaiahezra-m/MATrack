@@ -8,8 +8,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit('Use the Borrowers page to delete a record.');
 }
 
-$id = filter_input(INPUT_POST, 'borrower_id', FILTER_VALIDATE_INT);
-if (!$id || $id < 1) {
+$rawId = $_POST['borrower_id'] ?? '';
+$id = is_string($rawId) ? trim($rawId) : '';
+if (!preg_match('/^BOR-[0-9]{3,}$/D', $id)) {
     http_response_code(400);
     exit('A valid borrower ID is required.');
 }

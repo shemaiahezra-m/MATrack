@@ -31,20 +31,33 @@ if ($errors === [] && !DATABASE_ENABLED) {
 } elseif ($errors === []) {
     try {
         $pdo = getDatabaseConnection();
+        $pdo->beginTransaction();
+        $pdo->exec('LOCK TABLE borrowers IN SHARE ROW EXCLUSIVE MODE');
+        $borrowerId = generateNextFormattedId($pdo, 'borrowers');
         $statement = $pdo->prepare(
-            'INSERT INTO borrowers (borrower_name, contact, department)
-             VALUES (:borrower_name, :contact, :department)'
+            'INSERT INTO borrowers (borrower_id, borrower_name, contact, department)
+             VALUES (:borrower_id, :borrower_name, :contact, :department)'
         );
         $statement->execute([
+            'borrower_id' => $borrowerId,
             'borrower_name' => $borrower['borrower_name'],
             'contact' => $borrower['contact'] !== '' ? $borrower['contact'] : null,
             'department' => $borrower['department'] !== '' ? $borrower['department'] : null,
         ]);
+        $pdo->commit();
 
-        header('Location: index.php?message=' . urlencode('Borrower added successfully.'));
+        header('Location: index.php?message=' . urlencode('Borrower ' . $borrowerId . ' added successfully.'));
         exit;
     } catch (PDOException $exception) {
+        if (isset($pdo) && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         $errors[] = 'Could not save this borrower. Check the database connection and try again.';
+    } catch (RuntimeException $exception) {
+        if (isset($pdo) && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        $errors[] = 'Could not generate a borrower ID. Check the existing borrower IDs and try again.';
     }
 }
 

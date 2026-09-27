@@ -21,7 +21,7 @@ $formMaterial = $flash['material'] ?? [
     'description' => '',
 ];
 $formAction = $flash['action'] ?? '';
-$formId = (int) ($flash['id'] ?? 0);
+$formId = (string) ($flash['id'] ?? '');
 
 $databaseError = null;
 if (DATABASE_ENABLED) {
@@ -42,7 +42,10 @@ if (DATABASE_ENABLED) {
 }
 
 $initialModal = isset($_GET['add']) ? 'add' : '';
-$requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
+$requestedEditId = $_GET['edit'] ?? '';
+if (!is_string($requestedEditId) || !preg_match('/^MAT-[0-9]{3,}$/D', $requestedEditId)) {
+    $requestedEditId = '';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -55,16 +58,16 @@ $requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
 <body>
 <div class="app-shell">
 <aside class="sidebar" aria-label="Main navigation">
-    <a class="brand-lockup" href="../index.php"><span class="brand-mark" aria-hidden="true">M</span><span>MATrack</span></a>
+    <a class="brand-lockup" href="../index.php"><img class="brand-logo" src="../assets/css/MATrack-Logo.png" alt="MATrack"></a>
     <p class="nav-heading">Overview</p>
     <nav class="side-nav">
-        <span class="nav-link disabled-link" aria-disabled="true"><span class="nav-icon" aria-hidden="true">▦</span>Dashboard</span>
+        <a class="nav-link" href="../dashboard/index.php"><span class="nav-icon" aria-hidden="true">▦</span>Dashboard</a>
     </nav>
     <p class="nav-heading">Inventory</p>
     <nav class="side-nav">
         <a class="nav-link active" href="index.php" aria-current="page"><span class="nav-icon" aria-hidden="true">▤</span>Materials<span class="active-indicator" aria-hidden="true"></span></a>
         <a class="nav-link" href="../borrowers/index.php"><span class="nav-icon" aria-hidden="true">♙</span>Borrowers</a>
-        <span class="nav-link disabled-link" aria-disabled="true"><span class="nav-icon" aria-hidden="true">↔</span>Transactions</span>
+        <a class="nav-link" href="../transactions/index.php"><span class="nav-icon" aria-hidden="true">↔</span>Transactions</a>
     </nav>
     <div class="sidebar-footer"><strong>MATrack</strong><span>Department inventory system</span></div>
 </aside>
@@ -102,10 +105,11 @@ $requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
         <?php else: ?>
             <div class="table-scroll">
                 <table>
-                    <thead><tr><th>Material</th><th>Category</th><th>Unit</th><th>Available Stock</th><th>Description</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>ID</th><th>Material</th><th>Category</th><th>Unit</th><th>Stock</th><th>Description</th><th>Actions</th></tr></thead>
                     <tbody id="materials-body">
                     <?php foreach ($materials as $material): ?>
                         <tr class="material-row" data-search="<?= escapeHtml(strtolower(implode(' ', [$material['material_name'], $material['category'] ?? '', $material['unit'], $material['description'] ?? '']))) ?>">
+                            <td class="record-id"><?= escapeHtml($material['material_id']) ?></td>
                             <td><span class="material-initial" aria-hidden="true"><?= escapeHtml(strtoupper(substr($material['material_name'], 0, 1))) ?></span><span class="material-name"><?= escapeHtml($material['material_name']) ?></span></td>
                             <td><?= escapeHtml($material['category']) !== '' ? '<span class="category-pill">' . escapeHtml($material['category']) . '</span>' : '<span class="muted">—</span>' ?></td>
                             <td><?= escapeHtml($material['unit']) ?></td>
@@ -115,12 +119,12 @@ $requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
                                 <details class="action-menu">
                                     <summary aria-label="Actions for <?= escapeHtml($material['material_name']) ?>">•••</summary>
                                     <div class="action-menu-panel">
-                                        <button class="menu-action" type="button" data-open-modal="edit" data-id="<?= (int) $material['material_id'] ?>"
+                                        <button class="menu-action" type="button" data-open-modal="edit" data-id="<?= escapeHtml($material['material_id']) ?>"
                                             data-name="<?= escapeHtml($material['material_name']) ?>" data-category="<?= escapeHtml($material['category']) ?>"
                                             data-unit="<?= escapeHtml($material['unit']) ?>" data-stock="<?= (int) $material['stock_quantity'] ?>"
                                             data-description="<?= escapeHtml($material['description']) ?>">Edit material</button>
                                         <form class="delete-form" action="delete.php" method="post" data-material-name="<?= escapeHtml($material['material_name']) ?>">
-                                            <input type="hidden" name="material_id" value="<?= (int) $material['material_id'] ?>">
+                                            <input type="hidden" name="material_id" value="<?= escapeHtml($material['material_id']) ?>">
                                             <button class="menu-action delete-menu-action" type="submit">Delete material</button>
                                         </form>
                                     </div>
@@ -139,8 +143,8 @@ $requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
 </main>
 </div>
 
-<div class="modal-backdrop" id="material-modal" hidden>
-    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-copy" tabindex="-1">
+<div class="drawer-shell" id="material-modal" hidden>
+    <section class="drawer-panel" role="region" aria-labelledby="modal-title" aria-describedby="modal-copy" tabindex="-1">
         <button class="modal-close" type="button" data-close-modal aria-label="Close dialog">×</button>
         <p class="eyebrow">Materials inventory</p>
         <h2 id="modal-title">Add Material</h2>
@@ -196,14 +200,18 @@ $requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
         document.getElementById('modal-copy').textContent = editing ? 'Update the details or current stock for this supply.' : 'Add a supply to your department inventory.';
         document.getElementById('submit-material').textContent = editing ? 'Save Changes' : 'Add Material';
         backdrop.hidden = false;
-        document.body.classList.add('modal-open');
+        requestAnimationFrame(() => backdrop.classList.add('is-open'));
+        document.body.classList.add('drawer-open');
         fields.name.focus();
     }
 
     function closeModal() {
-        backdrop.hidden = true;
-        document.body.classList.remove('modal-open');
+        backdrop.classList.remove('is-open');
+        document.body.classList.remove('drawer-open');
         if (lastTrigger) lastTrigger.focus();
+        window.setTimeout(() => {
+            if (!backdrop.classList.contains('is-open')) backdrop.hidden = true;
+        }, 220);
     }
 
     document.querySelectorAll('[data-open-modal]').forEach((button) => {
@@ -221,17 +229,9 @@ $requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
         });
     });
     document.querySelectorAll('[data-close-modal]').forEach((button) => button.addEventListener('click', closeModal));
-    backdrop.addEventListener('click', (event) => { if (event.target === backdrop) closeModal(); });
     document.addEventListener('keydown', (event) => {
         if (backdrop.hidden) return;
         if (event.key === 'Escape') closeModal();
-        if (event.key === 'Tab') {
-            const focusable = backdrop.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href], summary');
-            const first = focusable[0];
-            const last = focusable[focusable.length - 1];
-            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-        }
     });
 
     if (search) {
@@ -249,16 +249,16 @@ $requestedEditId = filter_input(INPUT_GET, 'edit', FILTER_VALIDATE_INT);
 
     <?php if ($initialModal !== ''): ?>openModal('add');<?php endif; ?>
     <?php if ($requestedEditId): ?>
-    const requestedEdit = document.querySelector('[data-open-modal="edit"][data-id="<?= (int) $requestedEditId ?>"]');
+    const requestedEdit = document.querySelector('[data-open-modal="edit"][data-id="<?= escapeHtml($requestedEditId) ?>"]');
     if (requestedEdit) openModal('edit', requestedEdit);
     <?php endif; ?>
     <?php if ($errors !== []): ?>
     const restoreEdit = <?= json_encode($formAction === 'edit') ?>;
     const restoreButton = restoreEdit
-        ? document.querySelector('[data-open-modal="edit"][data-id="<?= $formId ?>"]')
+        ? document.querySelector('[data-open-modal="edit"][data-id="<?= escapeHtml($formId) ?>"]')
         : null;
     openModal(restoreEdit ? 'edit' : 'add', restoreButton);
-    fields.id.value = '<?= $formId ?>' || fields.id.value;
+    fields.id.value = <?= json_encode($formId, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?> || fields.id.value;
     form.action = restoreEdit ? `edit.php?id=${encodeURIComponent(fields.id.value)}` : 'create.php';
     fields.name.value = <?= json_encode($formMaterial['material_name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     fields.category.value = <?= json_encode($formMaterial['category'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;

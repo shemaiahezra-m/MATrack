@@ -4,13 +4,15 @@ require_once __DIR__ . '/../config/database.php';
 session_start();
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $requestedId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-    header('Location: index.php?edit=' . (int) $requestedId);
+    $rawId = $_GET['id'] ?? '';
+    $requestedId = is_string($rawId) ? trim($rawId) : '';
+    header('Location: index.php?edit=' . urlencode($requestedId));
     exit;
 }
 
-$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-if (!$id || $id < 1) {
+$rawId = $_GET['id'] ?? '';
+$id = is_string($rawId) ? trim($rawId) : '';
+if (!preg_match('/^MAT-[0-9]{3,}$/D', $id)) {
     http_response_code(400);
     exit('A valid material ID is required.');
 }
@@ -29,7 +31,7 @@ if (DATABASE_ENABLED) {
 } else {
     $material = null;
     foreach (getDemoMaterials() as $demoMaterial) {
-        if ((int) $demoMaterial['material_id'] === $id) {
+        if ($demoMaterial['material_id'] === $id) {
             $material = $demoMaterial;
             break;
         }

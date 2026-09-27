@@ -40,22 +40,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($errors === []) {
         try {
             $pdo = getDatabaseConnection();
+            $pdo->beginTransaction();
+            $pdo->exec('LOCK TABLE materials IN SHARE ROW EXCLUSIVE MODE');
+            $materialId = generateNextFormattedId($pdo, 'materials');
             $statement = $pdo->prepare(
-                'INSERT INTO materials (material_name, category, unit, stock_quantity, description)
-                 VALUES (:material_name, :category, :unit, :stock_quantity, :description)'
+                'INSERT INTO materials (material_id, material_name, category, unit, stock_quantity, description)
+                 VALUES (:material_id, :material_name, :category, :unit, :stock_quantity, :description)'
             );
             $statement->execute([
+                'material_id' => $materialId,
                 'material_name' => $material['material_name'],
                 'category' => $material['category'] !== '' ? $material['category'] : null,
                 'unit' => $material['unit'],
                 'stock_quantity' => (int) $material['stock_quantity'],
                 'description' => $material['description'] !== '' ? $material['description'] : null,
             ]);
+            $pdo->commit();
 
-            header('Location: index.php?message=' . urlencode('Material added successfully.'));
+            header('Location: index.php?message=' . urlencode('Material ' . $materialId . ' added successfully.'));
             exit;
         } catch (PDOException $exception) {
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             $errors[] = 'Could not save the material. Check the database connection and try again.';
+        } catch (RuntimeException $exception) {
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $errors[] = 'Could not generate a material ID. Check the existing material IDs and try again.';
         }
     }
 }

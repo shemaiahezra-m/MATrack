@@ -8,8 +8,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit('Use the materials page to delete a record.');
 }
 
-$id = filter_input(INPUT_POST, 'material_id', FILTER_VALIDATE_INT);
-if (!$id || $id < 1) {
+$rawId = $_POST['material_id'] ?? '';
+$id = is_string($rawId) ? trim($rawId) : '';
+if (!preg_match('/^MAT-[0-9]{3,}$/D', $id)) {
     http_response_code(400);
     exit('A valid material ID is required.');
 }
