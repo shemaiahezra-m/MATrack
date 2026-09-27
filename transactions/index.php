@@ -87,6 +87,21 @@ if (!$databaseAvailable) {
     }
 }
 
+$activeBorrowingCount = count(array_filter(
+    $transactions,
+    static fn (array $transaction): bool => $transaction['transaction_type'] === 'BORROWED'
+        && $transaction['status'] === 'ACTIVE'
+));
+$returnedTransactionCount = count(array_filter(
+    $transactions,
+    static fn (array $transaction): bool => $transaction['transaction_type'] === 'RETURNED'
+        || $transaction['status'] === 'RETURNED'
+));
+$overdueTransactionCount = count(array_filter(
+    $transactions,
+    static fn (array $transaction): bool => $transaction['status'] === 'OVERDUE'
+));
+
 $initialModal = isset($_GET['add']) ? 'add' : '';
 $requestedEditId = $_GET['edit'] ?? '';
 if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requestedEditId)) {
@@ -138,6 +153,13 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
     <?php if ($databaseError !== null): ?>
         <section class="error-panel"><h2>Could not connect to the database</h2><p>Check the connection settings in <code>config/database.php</code> and confirm PostgreSQL is reachable.</p><p class="technical-error"><?= escapeHtml($databaseError) ?></p></section>
     <?php endif; ?>
+
+    <section class="dashboard-summary transaction-summary" aria-label="Transaction summary">
+        <article class="summary-card"><span class="summary-label">Total Transactions</span><strong class="summary-value"><?= count($transactions) ?></strong><span class="summary-detail">records in transaction history</span></article>
+        <article class="summary-card"><span class="summary-label">Active Borrowings</span><strong class="summary-value"><?= $activeBorrowingCount ?></strong><span class="summary-detail">borrowed records marked active</span></article>
+        <article class="summary-card"><span class="summary-label">Returned Transactions</span><strong class="summary-value"><?= $returnedTransactionCount ?></strong><span class="summary-detail">records marked as returned</span></article>
+        <article class="summary-card"><span class="summary-label">Overdue Transactions</span><strong class="summary-value"><?= $overdueTransactionCount ?></strong><span class="summary-detail">records that need attention</span></article>
+    </section>
 
     <section class="inventory-card" aria-label="Transactions">
         <div class="inventory-toolbar">
