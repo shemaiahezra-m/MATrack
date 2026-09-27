@@ -3,7 +3,7 @@
  * Set this to true after the shared PostgreSQL database is ready.
  * In demo mode, pages use sample rows and do not call the database.
  */
-const DATABASE_ENABLED = false;
+const DATABASE_ENABLED = true;
 
 function getDemoMaterials(): array
 {
@@ -11,6 +11,7 @@ function getDemoMaterials(): array
         [
             'material_id' => 'MAT-001',
             'material_name' => 'Cartolina',
+            'color' => 'Assorted colors',
             'category' => 'Paper',
             'unit' => 'sheets',
             'stock_quantity' => 25,
@@ -19,6 +20,7 @@ function getDemoMaterials(): array
         [
             'material_id' => 'MAT-002',
             'material_name' => 'Scissors',
+            'color' => null,
             'category' => 'Tools',
             'unit' => 'pieces',
             'stock_quantity' => 8,
@@ -27,6 +29,7 @@ function getDemoMaterials(): array
         [
             'material_id' => 'MAT-003',
             'material_name' => 'Markers',
+            'color' => 'Assorted colors',
             'category' => 'Art supplies',
             'unit' => 'sets',
             'stock_quantity' => 6,
@@ -70,6 +73,7 @@ function getDemoTransactions(): array
             'quantity' => 3,
             'transaction_date' => '2026-09-27 09:00:00',
             'expected_return_date' => '2026-10-02',
+            'return_date' => null,
             'status' => 'ACTIVE',
             'notes' => 'Three Cartolina sheets borrowed for event posters.',
         ],
@@ -81,6 +85,7 @@ function getDemoTransactions(): array
             'quantity' => 2,
             'transaction_date' => '2026-09-26 13:30:00',
             'expected_return_date' => '2026-10-01',
+            'return_date' => null,
             'status' => 'ACTIVE',
             'notes' => 'Scissors for booth setup.',
         ],
@@ -92,7 +97,8 @@ function getDemoTransactions(): array
             'quantity' => 2,
             'transaction_date' => '2026-09-26 16:15:00',
             'expected_return_date' => null,
-            'status' => 'RETURNED',
+            'return_date' => '2026-09-26 16:15:00',
+            'status' => 'COMPLETED',
             'notes' => 'Two Cartolina sheets returned.',
         ],
         [
@@ -103,19 +109,21 @@ function getDemoTransactions(): array
             'quantity' => 1,
             'transaction_date' => '2026-09-25 10:00:00',
             'expected_return_date' => null,
-            'status' => 'ACTIVE',
+            'return_date' => null,
+            'status' => 'COMPLETED',
             'notes' => 'One Cartolina sheet used for a department sign.',
         ],
         [
             'transaction_id' => 'TRX-005',
             'material_id' => 'MAT-002',
             'borrower_id' => null,
-            'transaction_type' => 'ADDED',
-            'quantity' => 5,
+            'transaction_type' => 'DISPOSED',
+            'quantity' => 1,
             'transaction_date' => '2026-09-24 14:00:00',
             'expected_return_date' => null,
-            'status' => 'ACTIVE',
-            'notes' => 'New stock received.',
+            'return_date' => null,
+            'status' => 'COMPLETED',
+            'notes' => 'Worn scissors removed from service.',
         ],
     ];
 }

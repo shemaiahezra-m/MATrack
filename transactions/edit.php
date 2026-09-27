@@ -40,6 +40,7 @@ $transaction = [
     'quantity' => postedString('quantity'),
     'transaction_date' => postedString('transaction_date'),
     'expected_return_date' => postedString('expected_return_date'),
+    'return_date' => postedString('return_date'),
     'status' => postedString('status'),
     'notes' => postedString('notes'),
 ];
@@ -88,7 +89,8 @@ if ($errors === [] && !DATABASE_ENABLED) {
                  SET material_id = :material_id, borrower_id = :borrower_id,
                      transaction_type = :transaction_type, quantity = :quantity,
                      transaction_date = :transaction_date,
-                     expected_return_date = :expected_return_date, status = :status, notes = :notes
+                     expected_return_date = :expected_return_date, return_date = :return_date,
+                     status = :status, notes = :notes
                  WHERE transaction_id = :transaction_id'
             );
             $statement->execute([
@@ -98,6 +100,7 @@ if ($errors === [] && !DATABASE_ENABLED) {
                 'quantity' => (int) $transaction['quantity'],
                 'transaction_date' => transactionDateForDatabase($transaction['transaction_date']),
                 'expected_return_date' => expectedReturnDateForDatabase($transaction['expected_return_date']),
+                'return_date' => returnDateForDatabase($transaction['return_date']),
                 'status' => $transaction['status'],
                 'notes' => $transaction['notes'] !== '' ? $transaction['notes'] : null,
                 'transaction_id' => $id,

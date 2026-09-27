@@ -15,6 +15,7 @@ $errors = $flash['errors'] ?? [];
 $message = $flash['message'] ?? (string) ($_GET['message'] ?? '');
 $formMaterial = $flash['material'] ?? [
     'material_name' => '',
+    'color' => '',
     'category' => '',
     'unit' => '',
     'stock_quantity' => '0',
@@ -24,18 +25,20 @@ $formAction = $flash['action'] ?? '';
 $formId = (string) ($flash['id'] ?? '');
 
 $databaseError = null;
+$databaseAvailable = false;
 if (DATABASE_ENABLED) {
     try {
         $pdo = $pdo ?? getDatabaseConnection();
         $statement = $pdo->query(
-            'SELECT material_id, material_name, category, unit, stock_quantity, description
+            'SELECT material_id, material_name, color, category, unit, stock_quantity, description
              FROM materials
              ORDER BY material_name'
         );
         $materials = $statement->fetchAll();
+        $databaseAvailable = true;
     } catch (PDOException $exception) {
         $databaseError = $exception->getMessage();
-        $materials = [];
+        $materials = getDemoMaterials();
     }
 } else {
     $materials = getDemoMaterials();
@@ -83,8 +86,8 @@ if (!is_string($requestedEditId) || !preg_match('/^MAT-[0-9]{3,}$/D', $requested
         <button class="button" type="button" data-open-modal="add"><span aria-hidden="true">＋</span> Add Material</button>
     </section>
 
-    <?php if (!DATABASE_ENABLED): ?>
-        <div class="demo-banner"><span class="demo-dot" aria-hidden="true"></span><div><strong>Preview mode</strong><span> Sample materials are shown. Changes are not saved until the database is connected.</span></div></div>
+    <?php if (!$databaseAvailable): ?>
+        <div class="demo-banner"><span class="demo-dot" aria-hidden="true"></span><div><strong>Preview mode</strong><span> Sample materials are shown. Changes are not saved until PostgreSQL is reachable.</span></div></div>
     <?php endif; ?>
 
     <?php if ($message !== ''): ?><p class="notice" role="status"><?= escapeHtml($message) ?></p><?php endif; ?>
@@ -108,9 +111,9 @@ if (!is_string($requestedEditId) || !preg_match('/^MAT-[0-9]{3,}$/D', $requested
                     <thead><tr><th>ID</th><th>Material</th><th>Category</th><th>Unit</th><th>Stock</th><th>Description</th><th>Actions</th></tr></thead>
                     <tbody id="materials-body">
                     <?php foreach ($materials as $material): ?>
-                        <tr class="material-row" data-search="<?= escapeHtml(strtolower(implode(' ', [$material['material_name'], $material['category'] ?? '', $material['unit'], $material['description'] ?? '']))) ?>">
+                        <tr class="material-row" data-search="<?= escapeHtml(strtolower(implode(' ', [$material['material_name'], $material['color'] ?? '', $material['category'] ?? '', $material['unit'], $material['description'] ?? '']))) ?>">
                             <td class="record-id"><?= escapeHtml($material['material_id']) ?></td>
-                            <td><span class="material-initial" aria-hidden="true"><?= escapeHtml(strtoupper(substr($material['material_name'], 0, 1))) ?></span><span class="material-name"><?= escapeHtml($material['material_name']) ?></span></td>
+                            <td><span class="material-initial" aria-hidden="true"><?= escapeHtml(strtoupper(substr($material['material_name'], 0, 1))) ?></span><span class="material-name"><?= escapeHtml($material['material_name']) ?></span><?php if (($material['color'] ?? '') !== ''): ?> <small class="material-variant" title="Color / Variant: <?= escapeHtml($material['color']) ?>"><?= escapeHtml($material['color']) ?></small><?php endif; ?></td>
                             <td><?= escapeHtml($material['category']) !== '' ? '<span class="category-pill">' . escapeHtml($material['category']) . '</span>' : '<span class="muted">—</span>' ?></td>
                             <td><?= escapeHtml($material['unit']) ?></td>
                             <td><span class="stock-count"><?= (int) $material['stock_quantity'] ?></span></td>
@@ -121,6 +124,7 @@ if (!is_string($requestedEditId) || !preg_match('/^MAT-[0-9]{3,}$/D', $requested
                                     <div class="action-menu-panel">
                                         <button class="menu-action" type="button" data-open-modal="edit" data-id="<?= escapeHtml($material['material_id']) ?>"
                                             data-name="<?= escapeHtml($material['material_name']) ?>" data-category="<?= escapeHtml($material['category']) ?>"
+                                            data-color="<?= escapeHtml($material['color'] ?? '') ?>"
                                             data-unit="<?= escapeHtml($material['unit']) ?>" data-stock="<?= (int) $material['stock_quantity'] ?>"
                                             data-description="<?= escapeHtml($material['description']) ?>">Edit material</button>
                                         <form class="delete-form" action="delete.php" method="post" data-material-name="<?= escapeHtml($material['material_name']) ?>">
@@ -138,7 +142,7 @@ if (!is_string($requestedEditId) || !preg_match('/^MAT-[0-9]{3,}$/D', $requested
             </div>
         <?php endif; ?>
     </section>
-    <footer class="page-footer">MATrack <span>·</span> Department Materials Inventory</footer>
+    <footer class="page-footer">MATrack <span>·</span> Department inventory system</footer>
 </div>
 </main>
 </div>
@@ -153,6 +157,8 @@ if (!is_string($requestedEditId) || !preg_match('/^MAT-[0-9]{3,}$/D', $requested
             <input type="hidden" name="material_id" id="material-id" value="">
             <label for="material-name">Material Name <span>*</span></label>
             <input id="material-name" name="material_name" maxlength="100" required>
+            <label for="material-color">Color / Variant</label>
+            <input id="material-color" name="color" maxlength="30" placeholder="e.g. Red, Blue, Black">
             <div class="form-row">
                 <div><label for="material-category">Category</label><input id="material-category" name="category" maxlength="50" placeholder="e.g. Art supplies"></div>
                 <div><label for="material-unit">Unit <span>*</span></label><input id="material-unit" name="unit" maxlength="20" required placeholder="e.g. pieces"></div>
@@ -161,7 +167,7 @@ if (!is_string($requestedEditId) || !preg_match('/^MAT-[0-9]{3,}$/D', $requested
             <input id="material-stock" name="stock_quantity" type="number" min="0" step="1" required value="0">
             <label for="material-description">Description</label>
             <textarea id="material-description" name="description" rows="3" placeholder="Optional details about this material"></textarea>
-            <?php if (!DATABASE_ENABLED): ?><p class="modal-demo-note">Preview mode is on. Submissions will not be saved.</p><?php endif; ?>
+            <?php if (!$databaseAvailable): ?><p class="modal-demo-note">Preview mode is on. Submissions will not be saved.</p><?php endif; ?>
             <div class="form-actions"><button class="button button-secondary" type="button" data-close-modal>Cancel</button><button class="button" type="submit" id="submit-material">Add Material</button></div>
         </form>
     </section>
@@ -177,6 +183,7 @@ if (!is_string($requestedEditId) || !preg_match('/^MAT-[0-9]{3,}$/D', $requested
     const fields = {
         id: document.getElementById('material-id'),
         name: document.getElementById('material-name'),
+        color: document.getElementById('material-color'),
         category: document.getElementById('material-category'),
         unit: document.getElementById('material-unit'),
         stock: document.getElementById('material-stock'),
@@ -192,6 +199,7 @@ if (!is_string($requestedEditId) || !preg_match('/^MAT-[0-9]{3,}$/D', $requested
         fields.id.value = editing ? (material.id || fields.id.value) : '';
         form.action = editing ? `edit.php?id=${encodeURIComponent(fields.id.value)}` : 'create.php';
         fields.name.value = editing ? (source ? material.name : fields.name.value) : '';
+        fields.color.value = editing ? (source ? material.color : fields.color.value) : '';
         fields.category.value = editing ? (source ? material.category : fields.category.value) : '';
         fields.unit.value = editing ? (source ? material.unit : fields.unit.value) : '';
         fields.stock.value = editing ? (source ? material.stock : fields.stock.value) : '0';
@@ -261,6 +269,7 @@ if (!is_string($requestedEditId) || !preg_match('/^MAT-[0-9]{3,}$/D', $requested
     fields.id.value = <?= json_encode($formId, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?> || fields.id.value;
     form.action = restoreEdit ? `edit.php?id=${encodeURIComponent(fields.id.value)}` : 'create.php';
     fields.name.value = <?= json_encode($formMaterial['material_name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    fields.color.value = <?= json_encode($formMaterial['color'] ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     fields.category.value = <?= json_encode($formMaterial['category'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     fields.unit.value = <?= json_encode($formMaterial['unit'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     fields.stock.value = <?= json_encode($formMaterial['stock_quantity'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;

@@ -18,17 +18,20 @@ if (!preg_match('/^MAT-[0-9]{3,}$/D', $id)) {
 }
 
 $errors = [];
+$databaseAvailable = false;
 if (DATABASE_ENABLED) {
     try {
         $pdo = getDatabaseConnection();
         $statement = $pdo->prepare('SELECT * FROM materials WHERE material_id = :id');
         $statement->execute(['id' => $id]);
         $material = $statement->fetch();
+        $databaseAvailable = true;
     } catch (PDOException $exception) {
-        http_response_code(500);
-        exit('Could not connect to the database. Check config/database.php.');
+        $material = null;
     }
-} else {
+}
+
+if (!$databaseAvailable) {
     $material = null;
     foreach (getDemoMaterials() as $demoMaterial) {
         if ($demoMaterial['material_id'] === $id) {
@@ -47,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $material = [
         'material_id' => $id,
         'material_name' => trim((string) ($_POST['material_name'] ?? '')),
+        'color' => trim((string) ($_POST['color'] ?? '')),
         'category' => trim((string) ($_POST['category'] ?? '')),
         'unit' => trim((string) ($_POST['unit'] ?? '')),
         'stock_quantity' => trim((string) ($_POST['stock_quantity'] ?? '')),
@@ -55,6 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($material['material_name'] === '' || strlen($material['material_name']) > 100) {
         $errors[] = 'Material name is required and must be 100 characters or fewer.';
+    }
+    if (strlen($material['color']) > 30) {
+        $errors[] = 'Color / variant must be 30 characters or fewer.';
     }
     if ($material['unit'] === '' || strlen($material['unit']) > 20) {
         $errors[] = 'Unit is required and must be 20 characters or fewer.';
@@ -66,18 +73,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Stock quantity must be a whole number of zero or more.';
     }
 
-    if ($errors === [] && !DATABASE_ENABLED) {
-        $errors[] = 'Demo mode is on, so these changes were not saved. The form is ready to use when the database is enabled.';
+    if ($errors === [] && !$databaseAvailable) {
+        $errors[] = 'PostgreSQL is unavailable, so these changes were not saved. The form is ready when the database connection is available.';
     } elseif ($errors === []) {
         try {
             $statement = $pdo->prepare(
                 'UPDATE materials
-                 SET material_name = :material_name, category = :category, unit = :unit,
+                 SET material_name = :material_name, color = :color, category = :category, unit = :unit,
                      stock_quantity = :stock_quantity, description = :description
                  WHERE material_id = :id'
             );
             $statement->execute([
                 'material_name' => $material['material_name'],
+                'color' => $material['color'] !== '' ? $material['color'] : null,
                 'category' => $material['category'] !== '' ? $material['category'] : null,
                 'unit' => $material['unit'],
                 'stock_quantity' => (int) $material['stock_quantity'],

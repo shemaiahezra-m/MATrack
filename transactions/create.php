@@ -23,6 +23,7 @@ $transaction = [
     'quantity' => postedString('quantity'),
     'transaction_date' => postedString('transaction_date'),
     'expected_return_date' => postedString('expected_return_date'),
+    'return_date' => postedString('return_date'),
     'status' => postedString('status'),
     'notes' => postedString('notes'),
 ];
@@ -66,10 +67,10 @@ if ($errors === [] && !DATABASE_ENABLED) {
             $statement = $pdo->prepare(
                 'INSERT INTO transactions
                     (transaction_id, material_id, borrower_id, transaction_type, quantity,
-                     transaction_date, expected_return_date, status, notes)
+                     transaction_date, expected_return_date, return_date, status, notes)
                  VALUES
                     (:transaction_id, :material_id, :borrower_id, :transaction_type, :quantity,
-                     :transaction_date, :expected_return_date, :status, :notes)'
+                     :transaction_date, :expected_return_date, :return_date, :status, :notes)'
             );
             $statement->execute([
                 'transaction_id' => $transactionId,
@@ -79,6 +80,7 @@ if ($errors === [] && !DATABASE_ENABLED) {
                 'quantity' => (int) $transaction['quantity'],
                 'transaction_date' => transactionDateForDatabase($transaction['transaction_date']),
                 'expected_return_date' => expectedReturnDateForDatabase($transaction['expected_return_date']),
+                'return_date' => returnDateForDatabase($transaction['return_date']),
                 'status' => $transaction['status'],
                 'notes' => $transaction['notes'] !== '' ? $transaction['notes'] : null,
             ]);

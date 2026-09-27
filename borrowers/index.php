@@ -22,6 +22,7 @@ $formAction = $flash['action'] ?? '';
 $formId = (string) ($flash['id'] ?? '');
 
 $databaseError = null;
+$databaseAvailable = false;
 if (DATABASE_ENABLED) {
     try {
         $pdo = getDatabaseConnection();
@@ -31,9 +32,10 @@ if (DATABASE_ENABLED) {
              ORDER BY borrower_name'
         );
         $borrowers = $statement->fetchAll();
+        $databaseAvailable = true;
     } catch (PDOException $exception) {
         $databaseError = $exception->getMessage();
-        $borrowers = [];
+        $borrowers = getDemoBorrowers();
     }
 } else {
     $borrowers = getDemoBorrowers();
@@ -80,8 +82,8 @@ if (!is_string($requestedEditId) || !preg_match('/^BOR-[0-9]{3,}$/D', $requested
         <button class="button" type="button" data-open-modal="add"><span aria-hidden="true">＋</span> Add Borrower</button>
     </section>
 
-    <?php if (!DATABASE_ENABLED): ?>
-        <div class="demo-banner"><span class="demo-dot" aria-hidden="true"></span><div><strong>Preview mode</strong><span> Sample borrowers are shown. Changes are not saved until the database is connected.</span></div></div>
+    <?php if (!$databaseAvailable): ?>
+        <div class="demo-banner"><span class="demo-dot" aria-hidden="true"></span><div><strong>Preview mode</strong><span> Sample borrowers are shown. Changes are not saved until PostgreSQL is reachable.</span></div></div>
     <?php endif; ?>
     <?php if ($message !== ''): ?><p class="notice" role="status"><?= escapeHtml($message) ?></p><?php endif; ?>
     <?php if ($errors !== []): ?>
@@ -131,7 +133,7 @@ if (!is_string($requestedEditId) || !preg_match('/^BOR-[0-9]{3,}$/D', $requested
             </div>
         <?php endif; ?>
     </section>
-    <footer class="page-footer">MATrack <span>·</span> Department Materials Inventory</footer>
+    <footer class="page-footer">MATrack <span>·</span> Department inventory system</footer>
 </div>
 </main>
 </div>
@@ -150,7 +152,7 @@ if (!is_string($requestedEditId) || !preg_match('/^BOR-[0-9]{3,}$/D', $requested
             <input id="borrower-contact" name="contact" maxlength="50" placeholder="Phone number or email">
             <label for="borrower-department">Department</label>
             <input id="borrower-department" name="department" maxlength="100" placeholder="e.g. Design Committee">
-            <?php if (!DATABASE_ENABLED): ?><p class="modal-demo-note">Preview mode is on. Submissions will not be saved.</p><?php endif; ?>
+            <?php if (!$databaseAvailable): ?><p class="modal-demo-note">Preview mode is on. Submissions will not be saved.</p><?php endif; ?>
             <div class="form-actions"><button class="button button-secondary" type="button" data-close-modal>Cancel</button><button class="button" type="submit" id="submit-borrower">Add Borrower</button></div>
         </form>
     </section>

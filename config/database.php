@@ -1,14 +1,16 @@
 <?php
+
 /**
  * Shared PostgreSQL connection settings.
- * Replace DB_HOST with your partner's Windows laptop IPv4 address. Both
- * computers must be on a network that can reach PostgreSQL on port 5432.
+ * Replace DB_HOST with your partner's Windows laptop IPv4 address.
+ * Both computers must be on a network that can reach PostgreSQL on port 5432.
  */
-const DB_HOST = '192.168.1.100';
+
+const DB_HOST = '127.0.0.1';
 const DB_PORT = '5432';
 const DB_NAME = 'matrack';
 const DB_USER = 'postgres';
-const DB_PASSWORD = 'change_this_password';
+const DB_PASSWORD = '';
 
 function getDatabaseConnection(): PDO
 {
@@ -18,6 +20,7 @@ function getDatabaseConnection(): PDO
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
+        PDO::ATTR_TIMEOUT => 3,
     ]);
 }
 
@@ -74,7 +77,7 @@ function generateNextFormattedId(PDO $pdo, string $entity): string
         $nextDigits = '0';
     }
 
-    if (strlen($prefix . '-' . $nextDigits) > 10) {
+    if (strlen($prefix . '-' . $nextDigits) > 20) {
         throw new RuntimeException('The next formatted ID is longer than the database ID column allows.');
     }
 

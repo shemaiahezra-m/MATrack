@@ -22,18 +22,20 @@ $message = $flash['message'] ?? (string) ($_GET['message'] ?? '');
 $formTransaction = $flash['transaction'] ?? [
     'material_id' => '',
     'borrower_id' => '',
-    'transaction_type' => 'ADDED',
+    'transaction_type' => 'BORROWED',
     'quantity' => '1',
     'transaction_date' => date('Y-m-d\TH:i'),
     'expected_return_date' => '',
+    'return_date' => '',
     'status' => 'ACTIVE',
     'notes' => '',
 ];
 $formAction = $flash['action'] ?? '';
 $formId = (string) ($flash['id'] ?? '');
-$transactionTypes = ['ADDED', 'BORROWED', 'RETURNED', 'USED'];
-$transactionStatuses = ['ACTIVE', 'RETURNED', 'OVERDUE', 'CANCELLED'];
+$transactionTypes = ['BORROWED', 'RETURNED', 'USED', 'DISPOSED'];
+$transactionStatuses = ['ACTIVE', 'COMPLETED', 'OVERDUE', 'CANCELLED'];
 $databaseError = null;
+$databaseAvailable = false;
 
 if (DATABASE_ENABLED) {
     try {
@@ -41,7 +43,7 @@ if (DATABASE_ENABLED) {
         $statement = $pdo->query(
             'SELECT t.transaction_id, t.material_id, m.material_name,
                     t.borrower_id, b.borrower_name, t.transaction_type,
-                    t.quantity, t.transaction_date, t.expected_return_date,
+                    t.quantity, t.transaction_date, t.expected_return_date, t.return_date,
                     t.status, t.notes
              FROM transactions AS t
              INNER JOIN materials AS m ON m.material_id = t.material_id
@@ -55,13 +57,13 @@ if (DATABASE_ENABLED) {
         $borrowers = $pdo->query(
             'SELECT borrower_id, borrower_name FROM borrowers ORDER BY borrower_name'
         )->fetchAll();
+        $databaseAvailable = true;
     } catch (PDOException $exception) {
         $databaseError = $exception->getMessage();
-        $transactions = [];
-        $materials = [];
-        $borrowers = [];
     }
-} else {
+}
+
+if (!$databaseAvailable) {
     $materials = getDemoMaterials();
     $borrowers = getDemoBorrowers();
     $materialsById = array_column($materials, null, 'material_id');
@@ -120,13 +122,13 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
         <div>
             <p class="eyebrow">Inventory activity</p>
             <h1>Transactions</h1>
-            <p class="intro-copy">Record material movements such as borrowing, returning, adding, using, and disposing supplies.</p>
+            <p class="intro-copy">Record borrowed, returned, used, and disposed department supplies.</p>
         </div>
         <button class="button" type="button" data-open-drawer="add"><span aria-hidden="true">＋</span> Add Transaction</button>
     </section>
 
-    <?php if (!DATABASE_ENABLED): ?>
-        <div class="demo-banner"><span class="demo-dot" aria-hidden="true"></span><div><strong>Preview mode</strong><span> Sample transactions are shown. Changes are not saved until the database is connected.</span></div></div>
+    <?php if (!$databaseAvailable): ?>
+        <div class="demo-banner"><span class="demo-dot" aria-hidden="true"></span><div><strong>Preview mode</strong><span> Sample transactions are shown. Changes are not saved until PostgreSQL is reachable.</span></div></div>
     <?php endif; ?>
     <?php if ($message !== ''): ?><p class="notice" role="status"><?= escapeHtml($message) ?></p><?php endif; ?>
     <?php if ($errors !== []): ?>
@@ -146,7 +148,7 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
         <?php else: ?>
             <div class="table-scroll">
                 <table>
-                        <thead><tr><th>Transaction ID</th><th>Material</th><th>Borrower</th><th>Type</th><th>Quantity</th><th>Transaction Date</th><th>Expected Return</th><th>Status</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Transaction ID</th><th>Material</th><th>Borrower</th><th>Type</th><th>Quantity</th><th>Transaction Date</th><th>Expected Return Date</th><th>Return Date</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
                     <tbody>
                     <?php foreach ($transactions as $transaction): ?>
                         <?php $dateInput = date('Y-m-d\TH:i', strtotime((string) $transaction['transaction_date'])); ?>
@@ -170,8 +172,10 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
                             <td><span class="type-badge type-<?= strtolower(escapeHtml($transaction['transaction_type'])) ?>"><?= escapeHtml($transaction['transaction_type']) ?></span></td>
                             <td><span class="stock-count"><?= (int) $transaction['quantity'] ?></span></td>
                             <td class="transaction-date"><?= escapeHtml(formatTransactionDate((string) $transaction['transaction_date'])) ?></td>
-                            <td><?= $transaction['expected_return_date'] !== null ? escapeHtml(date('M j, Y', strtotime((string) $transaction['expected_return_date']))) : '<span class="muted">—</span>' ?></td>
+                            <td class="transaction-date"><?= $transaction['expected_return_date'] !== null ? escapeHtml(date('M j, Y', strtotime((string) $transaction['expected_return_date']))) : '<span class="muted">—</span>' ?></td>
+                            <td class="transaction-date"><?= $transaction['return_date'] !== null ? escapeHtml(formatTransactionDate((string) $transaction['return_date'])) : '<span class="muted">—</span>' ?></td>
                             <td><span class="status-badge status-<?= strtolower(escapeHtml($transaction['status'])) ?>"><?= escapeHtml($transaction['status']) ?></span></td>
+                            <td class="description-cell"><?= $transaction['notes'] !== null && $transaction['notes'] !== '' ? escapeHtml($transaction['notes']) : '<span class="muted">—</span>' ?></td>
                             <td class="actions">
                                 <details class="action-menu">
                                     <summary aria-label="Actions for <?= escapeHtml($transaction['transaction_id']) ?>">•••</summary>
@@ -184,6 +188,7 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
                                             data-quantity="<?= (int) $transaction['quantity'] ?>"
                                             data-date="<?= escapeHtml($dateInput) ?>"
                                             data-expected-return-date="<?= escapeHtml($transaction['expected_return_date'] ?? '') ?>"
+                                            data-return-date="<?= escapeHtml($transaction['return_date'] !== null ? date('Y-m-d\\TH:i', strtotime((string) $transaction['return_date'])) : '') ?>"
                                             data-status="<?= escapeHtml($transaction['status']) ?>"
                                             data-notes="<?= escapeHtml($transaction['notes']) ?>">Edit transaction</button>
                                         <form class="delete-form" action="delete.php" method="post" data-transaction-id="<?= escapeHtml($transaction['transaction_id']) ?>">
@@ -201,7 +206,7 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
             </div>
         <?php endif; ?>
     </section>
-    <footer class="page-footer">MATrack <span>·</span> Department Materials Inventory</footer>
+    <footer class="page-footer">MATrack <span>·</span> Department inventory system</footer>
 </div>
 </main>
 </div>
@@ -223,14 +228,14 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
                 <?php endforeach; ?>
             </select>
 
-            <label for="transaction-borrower">Borrower <span id="borrower-required-marker" hidden>*</span></label>
+            <label for="transaction-borrower">Borrower</label>
             <select id="transaction-borrower" name="borrower_id">
                 <option value="">No borrower</option>
                 <?php foreach ($borrowers as $borrower): ?>
                     <option value="<?= escapeHtml($borrower['borrower_id']) ?>"><?= escapeHtml($borrower['borrower_name']) ?> (<?= escapeHtml($borrower['borrower_id']) ?>)</option>
                 <?php endforeach; ?>
             </select>
-            <p class="field-hint">Required for borrowed and returned transactions.</p>
+            <p class="field-hint">Optional. Leave blank for transactions without a borrower.</p>
 
             <label for="transaction-type">Transaction Type <span>*</span></label>
             <select id="transaction-type" name="transaction_type" required>
@@ -245,8 +250,11 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
             <label for="transaction-date">Transaction Date <span>*</span></label>
             <input id="transaction-date" name="transaction_date" type="datetime-local" value="<?= escapeHtml(date('Y-m-d\TH:i')) ?>" required>
 
-            <label for="expected-return-date">Expected Return Date <span id="expected-return-required-marker" hidden>*</span></label>
+            <label id="expected-return-date-label" for="expected-return-date">Expected Return Date</label>
             <input id="expected-return-date" name="expected_return_date" type="date">
+
+            <label id="return-date-label" for="return-date">Return Date</label>
+            <input id="return-date" name="return_date" type="datetime-local">
 
             <label for="transaction-status">Status <span>*</span></label>
             <select id="transaction-status" name="status" required>
@@ -257,7 +265,7 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
 
             <label for="transaction-notes">Notes</label>
             <textarea id="transaction-notes" name="notes" rows="3" placeholder="Optional details"></textarea>
-            <?php if (!DATABASE_ENABLED): ?><p class="modal-demo-note">Preview mode is on. Submissions are not saved.</p><?php endif; ?>
+            <?php if (!$databaseAvailable): ?><p class="modal-demo-note">Preview mode is on. Submissions are not saved.</p><?php endif; ?>
             <div class="form-actions"><button class="button button-secondary" type="button" data-close-drawer>Cancel</button><button class="button" type="submit" id="save-transaction">Save Transaction</button></div>
         </form>
     </section>
@@ -272,8 +280,9 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
     const material = document.getElementById('transaction-material');
     const borrower = document.getElementById('transaction-borrower');
     const type = document.getElementById('transaction-type');
-    const requiredMarker = document.getElementById('borrower-required-marker');
     const expectedReturnDate = document.getElementById('expected-return-date');
+    const expectedReturnDateLabel = document.getElementById('expected-return-date-label');
+    const returnDateLabel = document.getElementById('return-date-label');
     const expectedReturnRequiredMarker = document.getElementById('expected-return-required-marker');
     const status = document.getElementById('transaction-status');
     let lastTrigger = null;
@@ -285,19 +294,24 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
         quantity: document.getElementById('transaction-quantity'),
         date: document.getElementById('transaction-date'),
         expectedReturnDate: expectedReturnDate,
+        returnDate: document.getElementById('return-date'),
         status: status,
         notes: document.getElementById('transaction-notes'),
     };
 
     function updateConditionalFields(applyDefaults = false) {
-        const typeRequiresBorrower = type.value === 'BORROWED' || type.value === 'RETURNED';
-        const typeRequiresExpectedDate = type.value === 'BORROWED';
-        borrower.required = typeRequiresBorrower;
-        requiredMarker.hidden = !typeRequiresBorrower;
-        expectedReturnDate.required = typeRequiresExpectedDate;
-        expectedReturnRequiredMarker.hidden = !typeRequiresExpectedDate;
-        if (type.value === 'ADDED' || type.value === 'USED') expectedReturnDate.value = '';
-        if (applyDefaults) status.value = type.value === 'RETURNED' ? 'RETURNED' : 'ACTIVE';
+        borrower.required = false;
+        const usesExpectedReturnDate = type.value === 'BORROWED';
+        const usesReturnDate = type.value === 'RETURNED';
+        expectedReturnDate.hidden = !usesExpectedReturnDate;
+        expectedReturnDateLabel.hidden = !usesExpectedReturnDate;
+        fields.returnDate.hidden = !usesReturnDate;
+        returnDateLabel.hidden = !usesReturnDate;
+        if (type.value !== 'BORROWED') expectedReturnDate.value = '';
+        if (type.value !== 'RETURNED') fields.returnDate.value = '';
+        if (applyDefaults) {
+            status.value = type.value === 'BORROWED' ? 'ACTIVE' : 'COMPLETED';
+        }
     }
 
     function openDrawer(mode, source = null) {
@@ -310,10 +324,11 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
         form.action = editing ? `edit.php?id=${encodeURIComponent(fields.id.value)}` : 'create.php';
         fields.material.value = editing ? (source ? transaction.materialId : fields.material.value) : '';
         fields.borrower.value = editing ? (source ? transaction.borrowerId : fields.borrower.value) : '';
-        fields.type.value = editing ? (source ? transaction.type : fields.type.value) : 'ADDED';
+        fields.type.value = editing ? (source ? transaction.type : fields.type.value) : 'BORROWED';
         fields.quantity.value = editing ? (source ? transaction.quantity : fields.quantity.value) : '1';
         fields.date.value = editing ? (source ? transaction.date : fields.date.value) : <?= json_encode(date('Y-m-d\TH:i')) ?>;
         fields.expectedReturnDate.value = editing ? (source ? transaction.expectedReturnDate : fields.expectedReturnDate.value) : '';
+        fields.returnDate.value = editing ? (source ? transaction.returnDate : fields.returnDate.value) : '';
         fields.status.value = editing ? (source ? transaction.status : fields.status.value) : 'ACTIVE';
         fields.notes.value = editing ? (source ? transaction.notes : fields.notes.value) : '';
         updateConditionalFields();
@@ -390,6 +405,7 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
     fields.quantity.value = <?= json_encode($formTransaction['quantity'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     fields.date.value = <?= json_encode($formTransaction['transaction_date'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     fields.expectedReturnDate.value = <?= json_encode($formTransaction['expected_return_date'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    fields.returnDate.value = <?= json_encode($formTransaction['return_date'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     fields.status.value = <?= json_encode($formTransaction['status'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     fields.notes.value = <?= json_encode($formTransaction['notes'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     document.getElementById('transaction-id-row').hidden = !restoreEdit;
