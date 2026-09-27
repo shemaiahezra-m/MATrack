@@ -45,6 +45,7 @@ if (DATABASE_ENABLED) {
 }
 
 $initialModal = isset($_GET['add']) ? 'add' : '';
+$lowStockThreshold = 10;
 $requestedEditId = $_GET['edit'] ?? '';
 if (!is_string($requestedEditId) || !preg_match('/^MAT-[0-9]{3,}$/D', $requestedEditId)) {
     $requestedEditId = '';
@@ -111,12 +112,13 @@ if (!is_string($requestedEditId) || !preg_match('/^MAT-[0-9]{3,}$/D', $requested
                     <thead><tr><th>ID</th><th>Material</th><th>Category</th><th>Unit</th><th>Stock</th><th>Description</th><th>Actions</th></tr></thead>
                     <tbody id="materials-body">
                     <?php foreach ($materials as $material): ?>
+                        <?php $isLowStock = (int) $material['stock_quantity'] <= $lowStockThreshold; ?>
                         <tr class="material-row" data-search="<?= escapeHtml(strtolower(implode(' ', [$material['material_name'], $material['color'] ?? '', $material['category'] ?? '', $material['unit'], $material['description'] ?? '']))) ?>">
                             <td class="record-id"><?= escapeHtml($material['material_id']) ?></td>
                             <td><span class="material-initial" aria-hidden="true"><?= escapeHtml(strtoupper(substr($material['material_name'], 0, 1))) ?></span><span class="material-name"><?= escapeHtml($material['material_name']) ?></span><?php if (($material['color'] ?? '') !== ''): ?> <small class="material-variant" title="Color / Variant: <?= escapeHtml($material['color']) ?>"><?= escapeHtml($material['color']) ?></small><?php endif; ?></td>
                             <td><?= escapeHtml($material['category']) !== '' ? '<span class="category-pill">' . escapeHtml($material['category']) . '</span>' : '<span class="muted">—</span>' ?></td>
                             <td><?= escapeHtml($material['unit']) ?></td>
-                            <td><span class="stock-count"><?= (int) $material['stock_quantity'] ?></span></td>
+                            <td><span class="stock-count<?= $isLowStock ? ' is-low-stock' : '' ?>"<?= $isLowStock ? ' title="Low stock" aria-label="Low stock: ' . (int) $material['stock_quantity'] . '"' : '' ?>><?= (int) $material['stock_quantity'] ?></span></td>
                             <td class="description-cell"><?= escapeHtml($material['description']) !== '' ? escapeHtml($material['description']) : '<span class="muted">—</span>' ?></td>
                             <td class="actions">
                                 <details class="action-menu">
