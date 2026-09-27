@@ -41,7 +41,7 @@ if (DATABASE_ENABLED) {
     try {
         $pdo = getDatabaseConnection();
         $statement = $pdo->query(
-            'SELECT t.transaction_id, t.material_id, m.material_name,
+            'SELECT t.transaction_id, t.material_id, m.material_name, m.color AS material_color,
                     t.borrower_id, b.borrower_name, t.transaction_type,
                     t.quantity, t.transaction_date, t.expected_return_date, t.return_date,
                     t.status, t.notes
@@ -52,10 +52,10 @@ if (DATABASE_ENABLED) {
         );
         $transactions = $statement->fetchAll();
         $materials = $pdo->query(
-            'SELECT material_id, material_name FROM materials ORDER BY material_name'
+            'SELECT material_id, material_name, color, unit, stock_quantity FROM materials ORDER BY material_name'
         )->fetchAll();
         $borrowers = $pdo->query(
-            'SELECT borrower_id, borrower_name FROM borrowers ORDER BY borrower_name'
+            'SELECT borrower_id, borrower_name, department FROM borrowers ORDER BY borrower_name'
         )->fetchAll();
         $databaseAvailable = true;
     } catch (PDOException $exception) {
@@ -81,6 +81,7 @@ if (!$databaseAvailable) {
 
         $transactions[] = array_merge($transaction, [
             'material_name' => $material['material_name'],
+            'material_color' => $material['color'] ?? null,
             'borrower_name' => $borrower['borrower_name'] ?? null,
         ]);
     }
@@ -156,6 +157,7 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
                             $transaction['transaction_id'],
                             $transaction['material_id'],
                             $transaction['material_name'],
+                            $transaction['material_color'] ?? '',
                             $transaction['borrower_id'] ?? '',
                             $transaction['borrower_name'] ?? '',
                                             $transaction['transaction_type'],
@@ -163,7 +165,7 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
                                             $transaction['notes'] ?? '',
                         ]))) ?>">
                             <td class="record-id"><?= escapeHtml($transaction['transaction_id']) ?></td>
-                            <td class="related-record"><strong><?= escapeHtml($transaction['material_name']) ?></strong><span><?= escapeHtml($transaction['material_id']) ?></span></td>
+                            <td class="related-record"><strong><?= escapeHtml($transaction['material_name']) ?></strong><span><?= escapeHtml($transaction['material_id']) ?></span><?php if (!empty($transaction['material_color'])): ?><small class="transaction-material-color">Color / Variant: <?= escapeHtml($transaction['material_color']) ?></small><?php endif; ?></td>
                             <td class="related-record">
                                 <?php if ($transaction['borrower_id'] !== null): ?>
                                     <strong><?= escapeHtml($transaction['borrower_name']) ?></strong><span><?= escapeHtml($transaction['borrower_id']) ?></span>
@@ -220,22 +222,41 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
         <form id="transaction-form" method="post" action="create.php">
             <input id="transaction-id" type="hidden" value="">
             <div class="drawer-id-row" id="transaction-id-row" hidden><span>Transaction ID</span><strong id="transaction-id-display"></strong></div>
-            <label for="transaction-material">Material <span>*</span></label>
-            <select id="transaction-material" name="material_id" required>
-                <option value="">Choose a material</option>
-                <?php foreach ($materials as $material): ?>
-                    <option value="<?= escapeHtml($material['material_id']) ?>"><?= escapeHtml($material['material_name']) ?> (<?= escapeHtml($material['material_id']) ?>)</option>
-                <?php endforeach; ?>
-            </select>
+            <section class="transaction-picker" aria-labelledby="borrower-picker-title">
+                <h3 id="borrower-picker-title">Select Borrower</h3>
+                <input class="transaction-picker-search" type="search" data-filter-cards="borrower" placeholder="Search borrower name or ID" aria-label="Search borrowers">
+                <select id="transaction-borrower" name="borrower_id" class="transaction-native-select" aria-hidden="true" tabindex="-1">
+                    <option value="">No borrower</option>
+                    <?php foreach ($borrowers as $borrower): ?>
+                        <option value="<?= escapeHtml($borrower['borrower_id']) ?>"><?= escapeHtml($borrower['borrower_name']) ?> (<?= escapeHtml($borrower['borrower_id']) ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="transaction-choice-grid" data-choice-grid="borrower">
+                    <button class="transaction-choice" type="button" data-choice="borrower" data-value="" data-search="no borrower optional"><strong>No borrower</strong><span>Optional</span></button>
+                    <?php foreach ($borrowers as $borrower): ?>
+                        <button class="transaction-choice" type="button" data-choice="borrower" data-value="<?= escapeHtml($borrower['borrower_id']) ?>" data-search="<?= escapeHtml(strtolower($borrower['borrower_name'] . ' ' . $borrower['borrower_id'] . ' ' . ($borrower['department'] ?? ''))) ?>"><strong><?= escapeHtml($borrower['borrower_name']) ?></strong><span><?= escapeHtml($borrower['borrower_id']) ?><?= !empty($borrower['department']) ? ' · ' . escapeHtml($borrower['department']) : '' ?></span></button>
+                    <?php endforeach; ?>
+                </div>
+                <p class="transaction-filter-empty" data-filter-empty="borrower" hidden>No borrowers match your search.</p>
+                <p class="field-hint">Required for borrowing and return transactions.</p>
+            </section>
 
-            <label for="transaction-borrower">Borrower</label>
-            <select id="transaction-borrower" name="borrower_id">
-                <option value="">No borrower</option>
-                <?php foreach ($borrowers as $borrower): ?>
-                    <option value="<?= escapeHtml($borrower['borrower_id']) ?>"><?= escapeHtml($borrower['borrower_name']) ?> (<?= escapeHtml($borrower['borrower_id']) ?>)</option>
-                <?php endforeach; ?>
-            </select>
-            <p class="field-hint">Optional. Leave blank for transactions without a borrower.</p>
+            <section class="transaction-picker" aria-labelledby="material-picker-title">
+                <h3 id="material-picker-title">Select Material <span>*</span></h3>
+                <input class="transaction-picker-search" type="search" data-filter-cards="material" placeholder="Search materials by name or ID" aria-label="Search materials">
+                <select id="transaction-material" name="material_id" class="transaction-native-select" aria-hidden="true" tabindex="-1">
+                    <option value="">Choose a material</option>
+                    <?php foreach ($materials as $material): ?>
+                        <option value="<?= escapeHtml($material['material_id']) ?>"><?= escapeHtml($material['material_name']) ?> (<?= escapeHtml($material['material_id']) ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="transaction-choice-grid" data-choice-grid="material">
+                    <?php foreach ($materials as $material): ?>
+                        <button class="transaction-choice" type="button" data-choice="material" data-value="<?= escapeHtml($material['material_id']) ?>" data-search="<?= escapeHtml(strtolower($material['material_name'] . ' ' . $material['material_id'] . ' ' . ($material['color'] ?? ''))) ?>"><strong><?= escapeHtml($material['material_name']) ?></strong><span><?= escapeHtml($material['material_id']) ?><?= isset($material['stock_quantity']) ? ' · ' . (int) $material['stock_quantity'] . ' ' . escapeHtml($material['unit'] ?? 'units') . ' available' : '' ?></span><?php if (!empty($material['color'])): ?><span class="transaction-variant">Color / Variant: <?= escapeHtml($material['color']) ?></span><?php endif; ?></button>
+                    <?php endforeach; ?>
+                </div>
+                <p class="transaction-filter-empty" data-filter-empty="material" hidden>No materials match your search.</p>
+            </section>
 
             <label for="transaction-type">Transaction Type <span>*</span></label>
             <select id="transaction-type" name="transaction_type" required>
@@ -314,6 +335,38 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
         }
     }
 
+    function updateChoiceCards(choiceType) {
+        const select = choiceType === 'material' ? fields.material : fields.borrower;
+        document.querySelectorAll(`[data-choice="${choiceType}"]`).forEach((card) => {
+            const selected = card.dataset.value === select.value;
+            card.classList.toggle('is-selected', selected);
+            card.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        });
+    }
+
+    document.querySelectorAll('[data-choice]').forEach((card) => {
+        card.addEventListener('click', () => {
+            const select = card.dataset.choice === 'material' ? fields.material : fields.borrower;
+            select.value = card.dataset.value;
+            updateChoiceCards(card.dataset.choice);
+        });
+    });
+
+    document.querySelectorAll('[data-filter-cards]').forEach((input) => {
+        input.addEventListener('input', () => {
+            const group = input.dataset.filterCards;
+            const query = input.value.trim().toLowerCase();
+            let visibleCount = 0;
+            document.querySelectorAll(`[data-choice="${group}"]`).forEach((card) => {
+                const visible = card.dataset.search.includes(query);
+                card.hidden = !visible;
+                if (visible) visibleCount += 1;
+            });
+            const emptyMessage = document.querySelector(`[data-filter-empty="${group}"]`);
+            if (emptyMessage) emptyMessage.hidden = visibleCount > 0;
+        });
+    });
+
     function openDrawer(mode, source = null) {
         const editing = mode === 'edit';
         const transaction = source ? source.dataset : {};
@@ -332,6 +385,8 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
         fields.status.value = editing ? (source ? transaction.status : fields.status.value) : 'ACTIVE';
         fields.notes.value = editing ? (source ? transaction.notes : fields.notes.value) : '';
         updateConditionalFields();
+        updateChoiceCards('material');
+        updateChoiceCards('borrower');
         document.getElementById('transaction-id-row').hidden = !editing;
         document.getElementById('transaction-id-display').textContent = editing ? fields.id.value : '';
         document.getElementById('drawer-title').textContent = editing ? 'Edit Transaction' : 'Add Transaction';
@@ -353,6 +408,12 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
     }
 
     type.addEventListener('change', () => updateConditionalFields(true));
+    form.addEventListener('submit', (event) => {
+        if (fields.material.value === '') {
+            event.preventDefault();
+            document.querySelector('[data-choice="material"]')?.focus();
+        }
+    });
     document.querySelectorAll('[data-open-drawer]').forEach((button) => {
         button.addEventListener('click', () => {
             const menu = button.closest('details');
@@ -411,6 +472,8 @@ if (!is_string($requestedEditId) || !preg_match('/^TRX-[0-9]{3,}$/D', $requested
     document.getElementById('transaction-id-row').hidden = !restoreEdit;
     document.getElementById('transaction-id-display').textContent = restoreEdit ? fields.id.value : '';
     updateConditionalFields();
+    updateChoiceCards('material');
+    updateChoiceCards('borrower');
     <?php endif; ?>
 })();
 </script>
