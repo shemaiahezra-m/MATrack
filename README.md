@@ -5,6 +5,26 @@ The app currently includes Materials, Borrowers, and Transactions pages. Each
 page uses the shared layout and keeps database operations in separate PHP
 handlers.
 
+<table>
+  <tr>
+    <td>
+      <img width="100%" alt="Screenshot 1" src="https://github.com/user-attachments/assets/22fdcd99-4c1c-4823-86f4-9bcaf44bd017" />
+    </td>
+    <td>
+      <img width="100%" alt="Screenshot 2" src="https://github.com/user-attachments/assets/704c5f62-96cb-478e-ab0a-9f957e224b71" />
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <img width="100%" alt="Screenshot 3" src="https://github.com/user-attachments/assets/82078468-1380-4e38-8dbf-2e8fad7606b2" />
+    </td>
+    <td>
+      <img width="100%" alt="Screenshot 4" src="https://github.com/user-attachments/assets/01df414e-bd22-4107-9185-5e60fdcfebe2" />
+    </td>
+  </tr>
+</table>
+
+
 ## Project structure
 
 ```text
