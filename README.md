@@ -142,3 +142,5 @@ validation errors and restore form values after a failed submission; it is not
 used to store or simulate CRUD records. Do not commit real database passwords
 to GitHub; replace the sample settings locally or move credentials to
 environment variables before publishing a public repository.
+
+"C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -d matrack_db -f "C:\Users\<USERNAME>\Desktop\matrack_data.sql"
