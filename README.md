@@ -146,3 +146,6 @@ environment variables before publishing a public repository.
 "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -d matrack_db -f "C:\Users\<USERNAME>\Desktop\matrack_data.sql"
 
 dir C:\Users\abell\ /s /b | findstr /i "matrack"
+
+"C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -d matrack_db -f "C:\Users\abell\OneDrive\Desktop\matrack_data.sql"
+
