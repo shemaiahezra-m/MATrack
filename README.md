@@ -143,6 +143,9 @@ used to store or simulate CRUD records. Do not commit real database passwords
 to GitHub; replace the sample settings locally or move credentials to
 environment variables before publishing a public repository.
 
+
+Commands
+
 "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -d matrack_db -f "C:\Users\<USERNAME>\Desktop\matrack_data.sql"
 
 dir C:\Users\abell\ /s /b | findstr /i "matrack"
