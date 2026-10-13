@@ -3,7 +3,7 @@
  * Set this to true after the shared PostgreSQL database is ready.
  * In demo mode, pages use sample rows and do not call the database.
  */
-const DATABASE_ENABLED = true;
+const DATABASE_ENABLED = false;
 
 function getDemoMaterials(): array
 {

@@ -32,7 +32,7 @@ if (DATABASE_ENABLED) {
         $statement = $pdo->query(
             'SELECT material_id, material_name, color, category, unit, stock_quantity, description
              FROM materials
-             ORDER BY material_name'
+             ORDER BY CAST(SUBSTRING(material_id FROM 5) AS INTEGER)'
         );
         $materials = $statement->fetchAll();
         $databaseAvailable = true;

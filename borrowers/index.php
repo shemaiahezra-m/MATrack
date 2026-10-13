@@ -29,7 +29,7 @@ if (DATABASE_ENABLED) {
         $statement = $pdo->query(
             'SELECT borrower_id, borrower_name, contact, department
              FROM borrowers
-             ORDER BY borrower_name'
+             ORDER BY CAST(SUBSTRING(borrower_id FROM 5) AS INTEGER)'
         );
         $borrowers = $statement->fetchAll();
         $databaseAvailable = true;

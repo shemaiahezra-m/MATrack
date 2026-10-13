@@ -51,11 +51,11 @@ if (DATABASE_ENABLED) {
         $pdo = getDatabaseConnection();
         $materials = $pdo->query(
             'SELECT material_id, material_name, category, unit, stock_quantity, description
-             FROM materials ORDER BY material_name'
+             FROM materials ORDER BY CAST(SUBSTRING(material_id FROM 5) AS INTEGER)'
         )->fetchAll();
         $borrowers = $pdo->query(
             'SELECT borrower_id, borrower_name, contact, department
-             FROM borrowers ORDER BY borrower_name'
+             FROM borrowers ORDER BY CAST(SUBSTRING(borrower_id FROM 5) AS INTEGER)'
         )->fetchAll();
         $transactions = $pdo->query(
             'SELECT t.transaction_id, t.material_id, t.borrower_id,
